@@ -1,44 +1,122 @@
-# Jagged Frontier Demo
+# Jagged Frontier Capability Indicator
 
-A small Claude Code prototype that makes the "jagged frontier" of AI capability visible inside the terminal. The same prompt gets a different capability verdict depending on which Claude model is active, so participants can see that capability is model-specific, not absolute.
+A Claude Code plugin that shows a real-time signal of how likely the agent is to handle the user's next prompt well. The verdict renders in the status line, with a short rationale surfaced before the model responds.
 
-The classifier is deliberately fake: it uses a tiny rule table, not a learned estimator. The point is the framing in the status line, not the underlying prediction.
+Built as a research prototype to study whether a visible capability signal changes how developers write prompts, when they intervene, and how they calibrate trust in the agent.
 
-## What it does
+## Motivation
 
-Two scripts wire into Claude Code:
+AI coding agents perform along a jagged frontier of capability. The same model that nails a small bug fix can fail a refactor in the same codebase. Users learn this frontier through trial and error, costing time, tokens, and trust in the tool.
 
-- `classifier.sh` runs as a `UserPromptSubmit` hook. It looks at the prompt and the active model, picks a verdict from a rule table, and writes the result to `/tmp/claude-classifier-${session_id}.json`. If the verdict is medium or high risk, it surfaces a system message to the user before the model responds.
-- `statusline.sh` runs as the custom status line. It reads the active model, normalizes it to Opus / Sonnet / Haiku, writes it to `/tmp/claude-model-${session_id}.txt` for the hook to read, and renders the model, context window, and capability indicator on a single line.
+This prototype gives users a hint before they commit to a prompt, so they can re-scope, gather more context, or escalate to a stronger model.
 
-The two scripts share state through `/tmp` files keyed by session id, so a session in one terminal does not stomp on a session in another.
+## Research questions
 
-Try a prompt containing the word "refactor" on Haiku vs Opus to see the verdicts diverge.
+- Does a real-time capability indicator change how developers write prompts, when they intervene, and how they trust the agent?
+- Which features (heuristic, model-based, retrieval-grounded) best predict success on a given prompt?
 
-## Requirements
+## What it is
 
-- Claude Code
-- `bash`, `jq`
-- `npx` and Node (used to call `ccusage` for the context window segment)
+- A Claude Code plugin with two surfaces: a `UserPromptSubmit` hook and a custom status line.
+- A demo-quality artifact for piloting the user experience of a capability indicator before investing in a real classifier.
+- Three indicator states in the current code: green (likely to succeed), yellow (mixed outlook), red (likely to struggle).
+
+## What it is not
+
+- Not a real classifier. The current logic is a single keyword check ("refactor") that branches on the active model. Outputs are example/demo data.
+- Not validated against any dataset of successful or failed prompts.
+- Not a finished UX. Status line position, colors, and copy are first-pass placeholders.
+- Not yet privacy-reviewed for any deployment study.
+
+## How it works
+
+- Claude Code fires the `UserPromptSubmit` hook before sending the user's prompt to the model. The hook receives the prompt text and session id on stdin.
+- `classifier.sh` runs a naive rule check, picks a verdict based on the active model, and writes the result to `/tmp/claude-classifier-${session_id}.json`.
+- `statusline.sh` runs on each status line refresh, reads the state file, and renders the indicator alongside the active model and context window usage.
+- The two scripts coordinate the active model through `/tmp/claude-model-${session_id}.txt`, written by the status line and read by the hook.
+- The hook does not block or modify the prompt. The indicator is observational only.
+- Latency is sub-10ms since the classifier is a regex match.
+
+## The naive classifier (example/demo only)
+
+Current rule:
+
+- If the prompt contains "refactor" (case-insensitive), pick a verdict from a small table keyed on the active model family (Haiku, Opus, Sonnet, Unknown).
+- Otherwise, mark the prompt as likely to succeed.
+
+Rationale: "refactor" stands in for tasks that are context-heavy and span many files, which Sarkar et al. (2026) flagged as a frontier-edge variable. The keyword is illustrative only, not a research claim.
 
 ## Install
 
-1. Clone this repo somewhere stable.
-2. Make the scripts executable: `chmod +x classifier.sh statusline.sh`.
-3. Point Claude Code at them. The included `.claude/settings.json` does this by referencing `${CLAUDE_PROJECT_DIR}`, so opening Claude Code in this directory is enough. To use the scripts from a different working directory, copy the settings into that project's `.claude/settings.json` and replace `${CLAUDE_PROJECT_DIR}` with the absolute path to this repo.
+Prereqs:
 
-## Files
+- macOS or Linux with `bash` and `jq`.
+- Node and `npx` for the context window segment (the status line calls `ccusage`).
+- Claude Code installed and authenticated.
 
-- `classifier.sh`: prompt-submit hook, writes verdict JSON.
-- `statusline.sh`: status line renderer, writes active model.
-- `.claude/settings.json`: wires the hook and status line into Claude Code.
+Steps (order matters):
 
-## Caveats
+1. Clone this repo.
+2. Confirm the scripts are executable: `chmod +x classifier.sh statusline.sh`.
+3. Open Claude Code in the repo directory: `cd jagged-frontier-demo && claude`. The included `.claude/settings.json` references `${CLAUDE_PROJECT_DIR}`, so Claude Code picks up the hook and status line automatically.
 
-- The rule table covers a single trigger word and three model families. It is a teaching prop, not a capability estimator.
-- State lives in `/tmp` and is cleared on reboot.
-- The "Unknown" model branch fires before the status line has run once in a fresh session, which is expected.
+To use the plugin from a different working directory, copy `.claude/settings.json` into that project's `.claude/` folder and replace `${CLAUDE_PROJECT_DIR}` with the absolute path to this repo.
 
-## Context
+## Verify
 
-Built for AI Kitchen sessions at Santa Clara University to give participants a concrete artifact that demonstrates the jagged-frontier idea: AI models have uneven strengths, and a tool that surfaces those gaps in context is more useful than a generic "AI can do anything" framing.
+- Start a session: `claude`.
+- The status line shows the active model, context window usage, and `Capability indicator: ⚪ Awaiting first prompt`.
+- Send a prompt containing "refactor". The status line turns yellow or red and a system message appears with the rationale.
+- Switch model with `/model` and re-send the same prompt. The verdict changes.
+- Send a prompt without "refactor". The status line turns green.
+
+## Uninstall
+
+Delete the clone. If you copied the settings into another project, revert that project's `.claude/settings.json`.
+
+## Repo structure
+
+- `classifier.sh`: the `UserPromptSubmit` hook. Reads the prompt, picks a verdict, writes the state file.
+- `statusline.sh`: the status line renderer. Reads the state file, writes the active model file, prints the indicator line.
+- `.claude/settings.json`: wires the hook and status line into Claude Code using `${CLAUDE_PROJECT_DIR}`.
+- `.gitignore`: standard ignores plus `.claude/settings.local.json`.
+- `README.md`: this file.
+
+## Roadmap
+
+- Replace the keyword check with a real classifier. Two-tier design: fast synchronous heuristics (prompt length, file scope, context window usage, harness type, risk keywords), plus an async Haiku call that updates the status line on the next refresh with richer reasoning.
+- Log (prompt, predicted label, actual outcome) tuples for offline evaluation. Outcome signals: tool-call success, user follow-up corrections, self-report.
+- Move from three discrete states to a continuous score once the classifier produces calibrated uncertainty.
+- Add a "why" affordance so users can inspect which features drove the verdict.
+- Run a small lab study (5 to 8 SCU HCI participants) before any field deployment.
+- Plan a deployment study with developers using Claude Code in their normal work.
+
+## Theoretical grounding
+
+- Dell'Acqua, F., et al. (2023). Navigating the jagged technological frontier. Harvard Business School working paper.
+- Sarkar, A., et al. (2026). CHI 2026 paper on context, harness, window position, and task risk in AI coding agents. Title and citation to confirm.
+- Vaithilingam, P., et al. Programmer experiences with AI code assistants.
+- Kapoor, S., et al. Open-world evaluations for measuring frontier AI capabilities.
+
+## Limitations
+
+- The "refactor" keyword is a placeholder. Do not interpret indicator output as a real prediction.
+- Coverage is limited to Claude Code. Findings will not generalize directly to Cursor, Windsurf, or chat-based interfaces without re-implementation.
+- Any future study population skews toward developers comfortable with CLI tools.
+- The hook has read access to all prompt text. Any deployment study needs IRB review and a participant-facing privacy notice.
+- State files live in `/tmp` and clear on reboot.
+
+## Team
+
+- Lab: SCU Human-Computer Interaction Lab (https://scuhci.com), directed by Kai Lukoff.
+- Prototype: Kai Lukoff.
+- Design and study planning: Tiffany Le and Akaash Trivedi.
+
+## License
+
+TBD, leaning toward MIT for a research artifact. Open an issue if you have a reason to restrict.
+
+## Contact
+
+- klukoff@scu.edu
+- Issues welcome. This is an active research prototype, not a maintained product.
