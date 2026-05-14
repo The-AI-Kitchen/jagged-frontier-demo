@@ -23,7 +23,13 @@ This prototype gives users a hint before they commit to a prompt, so they can re
 
 ## What it looks like
 
-Three example states from the current demo build. Screenshots are example/demo data, not validated predictions.
+The status line has three segments separated by `|`:
+
+- 🤖 Active model
+- 🧠 Context window usage
+- Capability indicator (verdict and short reason)
+
+The model and context segments build on [`ccusage`](https://www.npmjs.com/package/ccusage), a popular community status line for Claude Code. The capability indicator is what this prototype adds; everything else is `ccusage`'s work, reused so the numbers stay accurate without re-implementing transcript parsing. Screenshots below are example/demo data, not validated predictions.
 
 **Green outlook.** Any prompt that does not contain the keyword "refactor", on any model. The classifier reports no known weak-spot patterns matched.
 
