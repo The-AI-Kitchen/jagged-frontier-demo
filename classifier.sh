@@ -24,7 +24,7 @@ else
 fi
 
 # Rule table. Each branch sets level/verdict/reason/rationale.
-# Same trigger ("refactor") deliberately yields different verdicts on Haiku vs Opus
+# Same trigger ("refactor") deliberately yields different verdicts across models
 # so the demo surfaces the jagged-frontier point.
 if echo "$prompt" | grep -iqE '\brefactor\b'; then
   case "$model" in
@@ -40,11 +40,23 @@ if echo "$prompt" | grep -iqE '\brefactor\b'; then
       reason='matched "refactor"'
       rationale='Opus handles scoped refactors competently but can drift on codebase-wide changes — losing invariants, adopting inconsistent style across files, or missing edge cases. Ask for a written plan first, narrow the scope to a directory or pattern, or specify which conventions must be preserved.'
       ;;
-    *)
+    Sonnet)
+      level="medium"
+      verdict="Mixed outlook"
+      reason='matched "refactor"'
+      rationale='Sonnet handles smaller refactors well but struggles with codebase-wide changes. It can miss cross-file impacts and drift on consistency. Narrow the scope, use a written plan, or escalate to Opus for larger refactors.'
+      ;;
+    Unknown)
       level="high"
       verdict="Likely to struggle"
       reason='matched "refactor"'
       rationale='Refactoring is a known weak spot for AI coding agents in general. The active model is unknown, so this is the conservative verdict — set the model in the status line for a more model-specific assessment.'
+      ;;
+    *)
+      level="high"
+      verdict="Likely to struggle"
+      reason='matched "refactor"'
+      rationale='Refactoring is a known weak spot for AI coding agents in general. This model is not in the capability database, so the conservative verdict applies — cross-file reasoning and scope consistency are risky. Consider narrowing the scope, using Opus, or providing a detailed written plan.'
       ;;
   esac
 else
