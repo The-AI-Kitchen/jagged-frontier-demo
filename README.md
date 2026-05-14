@@ -21,6 +21,22 @@ This prototype gives users a hint before they commit to a prompt, so they can re
 - A demo-quality artifact for piloting the user experience of a capability indicator before investing in a real classifier.
 - Three indicator states in the current code: green (likely to succeed), yellow (mixed outlook), red (likely to struggle).
 
+## What it looks like
+
+Three example states from the current demo build. Screenshots are example/demo data, not validated predictions.
+
+**Green outlook.** Any prompt that does not contain the keyword "refactor", on any model. The classifier reports no known weak-spot patterns matched.
+
+![Status line showing a green Capability indicator after a prompt with no risk keywords](screenshots/allmodels-green-outlook.png)
+
+**Mixed outlook (yellow).** A prompt containing "refactor" while Opus 4.7 is the active model. The classifier escalates to a "Mixed outlook" verdict and surfaces a rationale about cross-file refactor risks before the model responds.
+
+![Status line showing a yellow Mixed outlook indicator on Opus 4.7 after a prompt containing "refactor"](screenshots/claude47-mixed-outlook.png)
+
+**Red outlook.** The same "refactor" prompt while Haiku 4.5 is the active model. The classifier escalates to "Likely to struggle" and recommends scoping the change or switching to a stronger model.
+
+![Status line showing a red Likely to struggle indicator on Haiku 4.5 after a prompt containing "refactor"](screenshots/haiku45-red-outlook.png)
+
 ## What it is not
 
 - Not a real classifier. The current logic is a single keyword check ("refactor") that branches on the active model. Outputs are example/demo data.
